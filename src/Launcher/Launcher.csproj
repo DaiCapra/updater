@@ -1,0 +1,16 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="10.0.9" />
+    <InternalsVisibleTo Include="Launcher.Tests" />
+    <ProjectReference Include="../Launcher.Core/Launcher.Core.csproj" />
+    <ProjectReference Include="../Launcher.Services/Launcher.Services.csproj" />
+  </ItemGroup>
+</Project>
