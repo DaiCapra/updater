@@ -8,3 +8,7 @@ TestResults/
 # Service-account keys
 credentials/
 *-key.json
+
+# Local planning notes
+plan.md
+launcher-plan.md
