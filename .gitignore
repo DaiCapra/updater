@@ -4,3 +4,7 @@
 TestResults/
 *.user
 *.suo
+
+# Service-account keys
+credentials/
+*-key.json

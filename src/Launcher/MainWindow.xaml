@@ -107,8 +107,10 @@
                 <WrapPanel>
                     <Button x:Name="CheckUpdatesButton" Content="Check for updates"
                             Click="CheckForUpdates" Padding="12,5" />
-                    <Button x:Name="DownloadButton" Content="Open download"
-                            Click="OpenDownload" Visibility="Collapsed" Margin="8,0,0,0" Padding="12,5" />
+                    <Button x:Name="DownloadButton" Content="Download"
+                            Click="OnDownloadClicked" Visibility="Collapsed" Margin="8,0,0,0" Padding="12,5" />
+                    <Button x:Name="ShowInFolderButton" Content="Show in folder"
+                            Click="ShowInFolder" Visibility="Collapsed" Margin="8,0,0,0" Padding="12,5" />
                 </WrapPanel>
             </StackPanel>
             <TextBlock Text="No apps in your library yet."

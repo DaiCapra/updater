@@ -7,6 +7,7 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using Launcher.Core;
+using Launcher.Core.Storage;
 
 namespace Launcher;
 
@@ -14,6 +15,8 @@ public partial class MainWindow : Window
 {
     private readonly MainWindowViewModel viewModel;
     private UpdateRelease? availableUpdate;
+    private CancellationTokenSource? downloadCancellation;
+    private string? downloadedPath;
 
     public MainWindow(MainWindowViewModel viewModel)
     {
@@ -51,7 +54,9 @@ public partial class MainWindow : Window
     {
         CheckUpdatesButton.IsEnabled = false;
         DownloadButton.Visibility = Visibility.Collapsed;
+        ShowInFolderButton.Visibility = Visibility.Collapsed;
         availableUpdate = null;
+        downloadedPath = null;
         UpdateStatus.Text = "Checking for updates…";
 
         try
@@ -60,7 +65,7 @@ public partial class MainWindow : Window
             if (availableUpdate is { } update)
             {
                 UpdateStatus.Text = $"Version {update.Version} is available.";
-                DownloadButton.Visibility = Visibility.Visible;
+                ResetDownloadButton(update);
             }
             else
             {
@@ -68,7 +73,7 @@ public partial class MainWindow : Window
             }
         }
         catch (Exception error) when (error is HttpRequestException or IOException or InvalidDataException or JsonException
-            or OperationCanceledException)
+            or OperationCanceledException or ReleaseStoreException)
         {
             UpdateStatus.Text = $"Could not check for updates. {error.Message}";
         }
@@ -78,21 +83,113 @@ public partial class MainWindow : Window
         }
     }
 
-    private void OpenDownload(object sender, RoutedEventArgs e)
+    private void ResetDownloadButton(UpdateRelease update)
     {
-        if (availableUpdate is { } update)
+        var canDownload = viewModel.CanDownload(update);
+        DownloadButton.Content = canDownload ? "Download" : "Open download";
+        DownloadButton.Visibility = canDownload || update.DownloadPage is not null ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private async void OnDownloadClicked(object sender, RoutedEventArgs e)
+    {
+        if (downloadCancellation is { } running)
         {
-            try
+            running.Cancel();
+            return;
+        }
+
+        if (availableUpdate is not { } update)
+        {
+            return;
+        }
+
+        if (!viewModel.CanDownload(update))
+        {
+            OpenDownloadPage(update);
+            return;
+        }
+
+        using var cancellation = new CancellationTokenSource();
+        downloadCancellation = cancellation;
+        CheckUpdatesButton.IsEnabled = false;
+        DownloadButton.Content = "Cancel";
+        UpdateStatus.Text = $"Downloading version {update.Version}…";
+        var progress = new Progress<double>(fraction =>
+        {
+            // Reports are posted to the UI thread and can arrive after the download finished.
+            if (downloadCancellation == cancellation)
             {
-                using var browser = Process.Start(new ProcessStartInfo(update.DownloadUrl.AbsoluteUri)
-                {
-                    UseShellExecute = true
-                });
+                UpdateStatus.Text = $"Downloading version {update.Version}… {fraction:P0}";
             }
-            catch (Win32Exception error)
-            {
-                UpdateStatus.Text = $"Could not open the download. {error.Message}";
-            }
+        });
+
+        var downloaded = false;
+        string status;
+        try
+        {
+            downloadedPath = await viewModel.DownloadAsync(update, progress, cancellation.Token);
+            downloaded = true;
+            status = $"Downloaded version {update.Version}.";
+        }
+        catch (OperationCanceledException) when (cancellation.IsCancellationRequested)
+        {
+            status = "Download canceled.";
+        }
+        catch (Exception error) when (error is ReleaseStoreException or HttpRequestException or IOException
+            or InvalidDataException or NotSupportedException or UnauthorizedAccessException or OperationCanceledException)
+        {
+            status = $"Could not download the update. {error.Message}";
+        }
+        finally
+        {
+            // Cleared before the final status is written so late progress reports are ignored.
+            downloadCancellation = null;
+            CheckUpdatesButton.IsEnabled = true;
+        }
+
+        UpdateStatus.Text = status;
+        if (downloaded)
+        {
+            DownloadButton.Visibility = Visibility.Collapsed;
+            ShowInFolderButton.Visibility = Visibility.Visible;
+        }
+        else
+        {
+            ResetDownloadButton(update);
+        }
+    }
+
+    private void OpenDownloadPage(UpdateRelease update)
+    {
+        if (update.DownloadPage is not { } page)
+        {
+            return;
+        }
+
+        try
+        {
+            using var browser = Process.Start(new ProcessStartInfo(page.AbsoluteUri) { UseShellExecute = true });
+        }
+        catch (Win32Exception error)
+        {
+            UpdateStatus.Text = $"Could not open the download. {error.Message}";
+        }
+    }
+
+    private void ShowInFolder(object sender, RoutedEventArgs e)
+    {
+        if (downloadedPath is not { } path)
+        {
+            return;
+        }
+
+        try
+        {
+            using var explorer = Process.Start("explorer.exe", $"/select,\"{path}\"");
+        }
+        catch (Win32Exception error)
+        {
+            UpdateStatus.Text = $"Could not open the folder. {error.Message}";
         }
     }
 }

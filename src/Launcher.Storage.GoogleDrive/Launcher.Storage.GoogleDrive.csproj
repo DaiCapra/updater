@@ -1,0 +1,13 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+  <ItemGroup>
+    <PackageReference Include="Google.Apis.Drive.v3" Version="1.78.0.4327" />
+    <InternalsVisibleTo Include="Launcher.Tests" />
+    <ProjectReference Include="../Launcher.Core/Launcher.Core.csproj" />
+    <ProjectReference Include="../Launcher.Services/Launcher.Services.csproj" />
+  </ItemGroup>
+</Project>

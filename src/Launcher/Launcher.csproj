@@ -12,5 +12,6 @@
     <InternalsVisibleTo Include="Launcher.Tests" />
     <ProjectReference Include="../Launcher.Core/Launcher.Core.csproj" />
     <ProjectReference Include="../Launcher.Services/Launcher.Services.csproj" />
+    <ProjectReference Include="../Launcher.Storage.GoogleDrive/Launcher.Storage.GoogleDrive.csproj" />
   </ItemGroup>
 </Project>

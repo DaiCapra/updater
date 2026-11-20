@@ -25,14 +25,17 @@ public class ProfileAndUpdateTests
                 }
                 """);
 
-            var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory);
+            var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, App.CreateProviders());
             using var services = App.CreateServices(profile);
 
             var viewModel = Assert.IsType<MainWindowViewModel>(services.GetService(typeof(MainWindowViewModel)));
             Assert.Equal("Example Studio", viewModel.Title);
             Assert.Equal(Path.Combine(directory.FullName, "art", "background.jpg"), viewModel.BackgroundPath);
             Assert.True(viewModel.CanCheckForUpdates);
-            Assert.Equal(new Uri("https://example.com/releases/latest.json"), profile.UpdateFeedUrl);
+            Assert.Equal(HttpJsonSourceFactory.TypeName, profile.UpdateSource?.Type);
+            Assert.Equal(
+                new Uri("https://example.com/releases/latest.json"),
+                Assert.IsType<HttpJsonSettings>(profile.UpdateSource?.Settings).Url);
             Assert.Equal(new Version(1, 2, 0), profile.InstalledVersion);
         }
         finally
@@ -57,7 +60,8 @@ public class ProfileAndUpdateTests
         {
             Assert.NotNull(update);
             Assert.Equal(Version.Parse(releaseVersion), update.Version);
-            Assert.Equal(new Uri("https://example.com/setup.exe"), update.DownloadUrl);
+            Assert.Equal(new Uri("https://example.com/setup.exe"), update.DownloadPage);
+            Assert.Null(update.File);
         }
         else
         {

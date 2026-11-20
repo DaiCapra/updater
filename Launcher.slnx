@@ -1,6 +1,8 @@
 <Solution>
   <Project Path="src/Launcher/Launcher.csproj" />
   <Project Path="src/Launcher.Core/Launcher.Core.csproj" />
+  <Project Path="src/Launcher.Publish/Launcher.Publish.csproj" />
   <Project Path="src/Launcher.Services/Launcher.Services.csproj" />
+  <Project Path="src/Launcher.Storage.GoogleDrive/Launcher.Storage.GoogleDrive.csproj" />
   <Project Path="tests/Launcher.Tests/Launcher.Tests.csproj" />
 </Solution>
