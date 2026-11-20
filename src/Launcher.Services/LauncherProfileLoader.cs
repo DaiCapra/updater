@@ -27,20 +27,27 @@ public static class LauncherProfileLoader
             ?? throw new InvalidDataException("The launcher profile must be a JSON object.");
 
         var profileDirectory = Path.GetDirectoryName(profilePath)!;
-        var updateSource = ParseUpdateSource(data, profileDirectory, providers);
-        if ((updateSource is null) != (data.InstalledVersion is null))
+        if (data.InstallId is { } installId && !PathSafety.IsPlainName(installId))
         {
-            throw new InvalidDataException("Set both an update source and installedVersion in the launcher profile.");
+            throw new InvalidDataException("The installId must be a plain folder name.");
+        }
+
+        if (data.Executable is { } executable && (string.IsNullOrWhiteSpace(executable) || Path.IsPathRooted(executable)))
+        {
+            throw new InvalidDataException("The executable must be a path relative to the build folder, such as App.exe.");
         }
 
         return new LauncherProfile(
             DisplayName: string.IsNullOrWhiteSpace(data.DisplayName) ? LauncherProfile.Default.DisplayName : data.DisplayName,
-            BackgroundPath: string.IsNullOrWhiteSpace(data.BackgroundImage)
-                ? null
-                : Path.GetFullPath(data.BackgroundImage, profileDirectory),
-            UpdateSource: updateSource,
-            InstalledVersion: data.InstalledVersion is null ? null : LauncherJson.ParseVersion(data.InstalledVersion, "installedVersion"));
+            BackgroundPath: ResolvePath(data.BackgroundImage, profileDirectory),
+            UpdateSource: ParseUpdateSource(data, profileDirectory, providers),
+            InstalledVersion: data.InstalledVersion is null ? null : LauncherJson.ParseVersion(data.InstalledVersion, "installedVersion"),
+            InstallId: data.InstallId,
+            Executable: data.Executable);
     }
+
+    private static string? ResolvePath(string? path, string profileDirectory) =>
+        string.IsNullOrWhiteSpace(path) ? null : Path.GetFullPath(path, profileDirectory);
 
     /// <summary>Reads a standalone <c>{ "type": ..., ... }</c> source file, such as a publish target.</summary>
     public static UpdateSourceConfig LoadSource(string path, ProviderRegistry providers)
@@ -85,5 +92,11 @@ public static class LauncherProfileLoader
     }
 
     private sealed record ProfileData(
-        string? DisplayName, string? BackgroundImage, string? UpdateFeedUrl, JsonElement? UpdateSource, string? InstalledVersion);
+        string? DisplayName,
+        string? BackgroundImage,
+        string? InstallId,
+        string? Executable,
+        string? UpdateFeedUrl,
+        JsonElement? UpdateSource,
+        string? InstalledVersion);
 }

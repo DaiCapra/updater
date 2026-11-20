@@ -239,11 +239,6 @@ public class ReleaseTests
 
     private static ReleasePublisher Publisher(InMemoryReleaseStore store) => new(store, store, ReleaseFileNaming.Default);
 
-    private sealed class SyncProgress<T>(Action<T> report) : IProgress<T>
-    {
-        public void Report(T value) => report(value);
-    }
-
     private sealed class CorruptingWriter : IReleaseStoreWriter
     {
         public Task<StoredFile> UploadAsync(string name, Stream content, IProgress<long>? progress, CancellationToken cancellationToken) =>

@@ -51,7 +51,7 @@ public abstract class ReleaseStoreContractTests
         {
             var reports = new List<long>();
             using var destination = new MemoryStream();
-            await reader.DownloadAsync(uploaded, destination, new RecordingProgress(reports), default);
+            await reader.DownloadAsync(uploaded, destination, new SyncProgress<long>(reports.Add), default);
 
             Assert.Equal(content, destination.ToArray());
             Assert.Equal(content.Length, reports.Last());
@@ -96,11 +96,6 @@ public abstract class ReleaseStoreContractTests
     }
 
     private static string UniqueName() => $"contract-{Guid.NewGuid():N}.bin";
-
-    private sealed class RecordingProgress(List<long> reports) : IProgress<long>
-    {
-        public void Report(long value) => reports.Add(value);
-    }
 }
 
 public sealed class InMemoryReleaseStoreContractTests : ReleaseStoreContractTests

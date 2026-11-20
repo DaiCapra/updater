@@ -3,12 +3,11 @@
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:shell="clr-namespace:System.Windows.Shell;assembly=PresentationFramework"
         Title="{Binding Title}"
+        Icon="Assets/rocket.ico"
         Width="760" Height="460"
         MinWidth="420" MinHeight="300"
         WindowStartupLocation="CenterScreen"
         WindowStyle="None"
-        Background="{StaticResource WindowBackgroundBrush}"
-        Foreground="{StaticResource TextBrush}"
         StateChanged="OnStateChanged">
     <shell:WindowChrome.WindowChrome>
         <shell:WindowChrome CaptionHeight="32" ResizeBorderThickness="6" GlassFrameThickness="0" UseAeroCaptionButtons="False" />
@@ -16,7 +15,13 @@
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BooleanToVisibility" />
 
+        <!-- Caption buttons are flat: no BasedOn, so the App.xaml Button template is not inherited.
+             The template reads its hover and pressed fills from ButtonHoverBrush / ButtonPressedBrush. -->
         <Style x:Key="CaptionButtonStyle" TargetType="Button">
+            <Style.Resources>
+                <SolidColorBrush x:Key="ButtonHoverBrush" Color="#FF3F4249" />
+                <SolidColorBrush x:Key="ButtonPressedBrush" Color="#FF4E525A" />
+            </Style.Resources>
             <Setter Property="Width" Value="46" />
             <Setter Property="Height" Value="32" />
             <Setter Property="Background" Value="Transparent" />
@@ -32,10 +37,10 @@
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF3F4249" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
                             </Trigger>
                             <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FF4E525A" />
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonPressedBrush}" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -44,78 +49,124 @@
         </Style>
 
         <Style x:Key="CloseButtonStyle" TargetType="Button" BasedOn="{StaticResource CaptionButtonStyle}">
-            <Setter Property="Template">
-                <Setter.Value>
-                    <ControlTemplate TargetType="Button">
-                        <Border x:Name="Bd" Background="{TemplateBinding Background}">
-                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
-                        </Border>
-                        <ControlTemplate.Triggers>
-                            <Trigger Property="IsMouseOver" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFE81123" />
-                            </Trigger>
-                            <Trigger Property="IsPressed" Value="True">
-                                <Setter TargetName="Bd" Property="Background" Value="#FFF1707A" />
-                            </Trigger>
-                        </ControlTemplate.Triggers>
-                    </ControlTemplate>
-                </Setter.Value>
-            </Setter>
+            <Style.Resources>
+                <SolidColorBrush x:Key="ButtonHoverBrush" Color="#FFE81123" />
+                <SolidColorBrush x:Key="ButtonPressedBrush" Color="#FFF1707A" />
+            </Style.Resources>
         </Style>
     </Window.Resources>
 
-    <Grid Background="{StaticResource WindowBackgroundBrush}">
+    <Grid Background="{StaticResource BackdropBrush}" MouseLeftButtonDown="DragWindow">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
+            <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <Border x:Name="Backdrop" Grid.RowSpan="2" Opacity="0.26" />
+        <!-- Per-app art, scaled to fit the window (set in code); the header and footer panels sit on top. Dragging anywhere that isn't a control moves the window. -->
+        <Border x:Name="Backdrop" Grid.RowSpan="3" RenderOptions.BitmapScalingMode="NearestNeighbor" />
 
-        <!-- Custom title bar: the empty area drags the window, buttons stay clickable. -->
-        <Grid Grid.Row="0" Height="32">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="Auto" />
-            </Grid.ColumnDefinitions>
-            <TextBlock Text="{Binding Title}"
-                       VerticalAlignment="Center"
-                       Margin="12,0,0,0"
-                       FontSize="12"
-                       Opacity="0.8" />
-            <StackPanel Grid.Column="1" Orientation="Horizontal">
-                <Button x:Name="MinimizeButton" Style="{StaticResource CaptionButtonStyle}"
-                        Content="&#xE921;" ToolTip="Minimize" Click="Minimize" />
-                <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButtonStyle}"
-                        Content="&#xE922;" ToolTip="Maximize" Click="ToggleMaximize" />
-                <Button x:Name="CloseButton" Style="{StaticResource CloseButtonStyle}"
-                        Content="&#xE8BB;" ToolTip="Close" Click="CloseWindow" />
+        <!-- Header: custom title bar (the empty area drags the window) plus the app name. -->
+        <Border Grid.Row="0"
+                Background="{StaticResource PanelBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="0,0,0,1">
+            <StackPanel>
+                <Grid Height="32">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" />
+                        <ColumnDefinition Width="Auto" />
+                    </Grid.ColumnDefinitions>
+                    <StackPanel Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                        <Image Source="Assets/rocket.png"
+                               Width="16" Height="16"
+                               VerticalAlignment="Center"
+                               RenderOptions.BitmapScalingMode="HighQuality" />
+                        <TextBlock Text="{Binding LauncherVersionText, Mode=OneTime}"
+                                   Margin="8,0,0,0"
+                                   FontSize="12"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}" />
+                    </StackPanel>
+                    <StackPanel Grid.Column="1" Orientation="Horizontal">
+                        <Button x:Name="MinimizeButton" Style="{StaticResource CaptionButtonStyle}"
+                                Content="&#xE921;" ToolTip="Minimize" Click="Minimize" />
+                        <Button x:Name="MaximizeButton" Style="{StaticResource CaptionButtonStyle}"
+                                Content="&#xE922;" ToolTip="Maximize" Click="ToggleMaximize" />
+                        <Button x:Name="CloseButton" Style="{StaticResource CloseButtonStyle}"
+                                Content="&#xE8BB;" ToolTip="Close" Click="CloseWindow" />
+                    </StackPanel>
+                </Grid>
+
+                <TextBlock Text="{Binding Title}" FontSize="26" FontWeight="SemiBold" Margin="32,0,32,14" />
             </StackPanel>
-        </Grid>
+        </Border>
 
-        <DockPanel Grid.Row="1" Margin="32,16,32,32">
-            <TextBlock DockPanel.Dock="Top"
-                       Text="{Binding Title}"
-                       FontSize="26"
-                       FontWeight="SemiBold" />
-            <StackPanel DockPanel.Dock="Bottom"
-                        Visibility="{Binding CanCheckForUpdates, Converter={StaticResource BooleanToVisibility}}">
-                <TextBlock x:Name="UpdateStatus"
+        <!-- Footer: a status line, then one action row. While busy the progress row takes the action row's place,
+             and the status line always keeps its space, so the footer never changes height. -->
+        <Border Grid.Row="2"
+                Background="{StaticResource PanelBackgroundBrush}"
+                BorderBrush="{StaticResource PanelBorderBrush}"
+                BorderThickness="0,1,0,0"
+                Padding="32,14,32,18">
+            <StackPanel>
+                <TextBlock Text="{Binding StatusText}"
                            AutomationProperties.LiveSetting="Polite"
-                           TextWrapping="Wrap"
-                           Margin="0,0,0,8" />
-                <WrapPanel>
-                    <Button x:Name="CheckUpdatesButton" Content="Check for updates"
-                            Click="CheckForUpdates" Padding="12,5" />
-                    <Button x:Name="DownloadButton" Content="Download"
-                            Click="OnDownloadClicked" Visibility="Collapsed" Margin="8,0,0,0" Padding="12,5" />
-                    <Button x:Name="ShowInFolderButton" Content="Show in folder"
-                            Click="ShowInFolder" Visibility="Collapsed" Margin="8,0,0,0" Padding="12,5" />
-                </WrapPanel>
+                           TextTrimming="CharacterEllipsis"
+                           Margin="0,0,0,10" />
+                <Grid>
+                    <!-- Idle: actions on the left, installed version on the right. -->
+                    <Grid Visibility="{Binding IsIdle, Converter={StaticResource BooleanToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <WrapPanel>
+                            <Button Content="Play" Style="{StaticResource AccentButton}" Margin="0,0,8,0" MinWidth="110"
+                                    Command="{Binding PlayCommand}"
+                                    Visibility="{Binding ShowPlay, Converter={StaticResource BooleanToVisibility}}" />
+                            <Button Content="{Binding InstallText}" Style="{StaticResource AccentButton}" Margin="0,0,8,0"
+                                    Command="{Binding InstallCommand}"
+                                    Visibility="{Binding ShowInstall, Converter={StaticResource BooleanToVisibility}}" />
+                            <Button Style="{StaticResource IconButton}" Content="{StaticResource RefreshIcon}" Margin="0,0,8,0"
+                                    ToolTip="Check for updates"
+                                    AutomationProperties.Name="Check for updates"
+                                    Command="{Binding CheckCommand}"
+                                    Visibility="{Binding ShowCheck, Converter={StaticResource BooleanToVisibility}}" />
+                            <Button Style="{StaticResource IconButton}" Content="{StaticResource FolderIcon}"
+                                    ToolTip="Open the install folder (builds, downloads and logs)"
+                                    AutomationProperties.Name="Open folder"
+                                    Command="{Binding OpenFolderCommand}"
+                                    Visibility="{Binding ShowOpenFolder, Converter={StaticResource BooleanToVisibility}}" />
+                        </WrapPanel>
+                        <TextBlock Grid.Column="1"
+                                   Margin="16,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="{Binding InstalledText}" />
+                    </Grid>
+
+                    <!-- Busy: progress bar, detail and Cancel in the same row. -->
+                    <Grid Visibility="{Binding IsBusy, Converter={StaticResource BooleanToVisibility}}">
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <ProgressBar VerticalAlignment="Center"
+                                     Minimum="0" Maximum="100"
+                                     Value="{Binding ProgressPercent, Mode=OneWay}"
+                                     IsIndeterminate="{Binding IsProgressIndeterminate, Mode=OneWay}" />
+                        <TextBlock Grid.Column="1"
+                                   Margin="12,0,0,0"
+                                   VerticalAlignment="Center"
+                                   Foreground="{StaticResource SecondaryTextBrush}"
+                                   Text="{Binding ProgressDetail}" />
+                        <Button Grid.Column="2" Content="Cancel" Margin="16,0,0,0"
+                                Command="{Binding CancelCommand}" />
+                    </Grid>
+                </Grid>
             </StackPanel>
-            <TextBlock Text="No apps in your library yet."
-                       HorizontalAlignment="Center"
-                       VerticalAlignment="Center" />
-        </DockPanel>
+        </Border>
     </Grid>
 </Window>

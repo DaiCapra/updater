@@ -11,7 +11,7 @@ public sealed class StoreReleaseDownloader(IReleaseStoreReader store, string sta
     public async Task<string> DownloadAsync(UpdateRelease release, IProgress<double>? progress, CancellationToken cancellationToken)
     {
         var file = release.File ?? throw new ArgumentException("The release has no stored file to download.", nameof(release));
-        if (file.Name.Length == 0 || Path.GetFileName(file.Name) != file.Name)
+        if (!PathSafety.IsPlainName(file.Name))
         {
             throw new InvalidDataException($"The release file name '{file.Name}' is not a plain file name.");
         }
@@ -39,7 +39,7 @@ public sealed class StoreReleaseDownloader(IReleaseStoreReader store, string sta
         {
             await using (var output = new FileStream(partial, FileMode.Create, FileAccess.Write, FileShare.None, 81920, useAsync: true))
             {
-                var bytes = new InlineProgress<long>(sent => progress?.Report(file.Size > 0 ? Math.Min(1, (double)sent / file.Size) : 0));
+                var bytes = new ActionProgress<long>(sent => progress?.Report(file.Size > 0 ? Math.Min(1, (double)sent / file.Size) : 0));
                 await store.DownloadAsync(file, output, bytes, cancellationToken).ConfigureAwait(false);
             }
 
@@ -63,10 +63,4 @@ public sealed class StoreReleaseDownloader(IReleaseStoreReader store, string sta
         new FileInfo(path).Length == file.Size
         && (file.Checksum is not { } checksum
             || await ChecksumAlgorithms.MatchesAsync(path, checksum, cancellationToken).ConfigureAwait(false));
-
-    /// <summary>Reports synchronously, unlike <see cref="Progress{T}"/>, so the caller decides which thread to marshal to.</summary>
-    private sealed class InlineProgress<T>(Action<T> report) : IProgress<T>
-    {
-        public void Report(T value) => report(value);
-    }
 }

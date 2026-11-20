@@ -1,4 +1,5 @@
 using System.Text.Json;
+using Launcher.Core;
 using Launcher.Core.Releases;
 using Launcher.Core.Storage;
 using Launcher.Services;
@@ -35,7 +36,7 @@ internal sealed class PublishCommand(ProviderRegistry providers, TextWriter outp
             var file = new FileInfo(filePath);
             var size = file.Exists ? file.Length : 0;
             var publisher = new ReleasePublisher(reader, writer, ReleaseFileNaming.Default);
-            var result = await publisher.PublishAsync(filePath, dryRun, new ConsoleProgress(output, size), cancellationToken);
+            var result = await publisher.PublishAsync(filePath, dryRun, UploadProgress(output, size), cancellationToken);
             await WriteResultAsync(result, target.Type);
             return 0;
         }
@@ -91,11 +92,10 @@ internal sealed class PublishCommand(ProviderRegistry providers, TextWriter outp
     }
 
     /// <summary>Prints upload progress in 10% steps.</summary>
-    private sealed class ConsoleProgress(TextWriter output, long total) : IProgress<long>
+    private static IProgress<long> UploadProgress(TextWriter output, long total)
     {
-        private int lastStep = -1;
-
-        public void Report(long bytes)
+        var lastStep = -1;
+        return new ActionProgress<long>(bytes =>
         {
             var step = total > 0 ? (int)Math.Min(10, bytes * 10 / total) : 10;
             if (step > lastStep)
@@ -103,6 +103,6 @@ internal sealed class PublishCommand(ProviderRegistry providers, TextWriter outp
                 lastStep = step;
                 output.WriteLine($"Uploaded {step * 10}%");
             }
-        }
+        });
     }
 }

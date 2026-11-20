@@ -1,0 +1,2 @@
+rocket.ico and rocket.png: rocket icon from Tabler Icons (https://tabler-icons.io), MIT License.
+The refresh and folder icons in App.xaml are also from Tabler Icons, MIT License.

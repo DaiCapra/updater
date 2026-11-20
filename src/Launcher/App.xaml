@@ -6,9 +6,20 @@
         <!-- Dark palette. Change these colors to restyle the whole launcher. -->
         <SolidColorBrush x:Key="WindowBackgroundBrush" Color="#FF2B2D31" />
         <SolidColorBrush x:Key="TextBrush" Color="#FFEEEEF2" />
-        <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF3A3D43" />
-        <SolidColorBrush x:Key="ControlBorderBrush" Color="#FF52555D" />
+        <SolidColorBrush x:Key="SecondaryTextBrush" Color="#FFB5B8C0" />
         <SolidColorBrush x:Key="DisabledTextBrush" Color="#FF8A8D96" />
+        <SolidColorBrush x:Key="ControlBackgroundBrush" Color="#FF3A3D43" />
+        <Color x:Key="ControlHoverColor">#FF464A51</Color>
+        <Color x:Key="ControlPressedColor">#FF52565E</Color>
+        <SolidColorBrush x:Key="ControlBorderBrush" Color="#FF52555D" />
+        <SolidColorBrush x:Key="AccentBrush" Color="#FFB8505F" />
+        <Color x:Key="AccentHoverColor">#FFC5606F</Color>
+        <Color x:Key="AccentPressedColor">#FFA14453</Color>
+        <SolidColorBrush x:Key="ProgressTrackBrush" Color="#FF1F2125" />
+        <SolidColorBrush x:Key="PanelBackgroundBrush" Color="#E61E2024" />
+        <!-- Behind the background image: matches the header and footer, so letterbox bars blend in when the window shape differs from the art. -->
+        <SolidColorBrush x:Key="BackdropBrush" Color="#FF1E2024" />
+        <SolidColorBrush x:Key="PanelBorderBrush" Color="#33FFFFFF" />
 
         <Style TargetType="Window">
             <Setter Property="Background" Value="{StaticResource WindowBackgroundBrush}" />
@@ -19,15 +30,135 @@
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
         </Style>
 
-        <Style TargetType="Button">
+        <Style TargetType="ToolTip">
             <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
-            <Style.Triggers>
-                <Trigger Property="IsEnabled" Value="False">
-                    <Setter Property="Foreground" Value="{StaticResource DisabledTextBrush}" />
-                </Trigger>
-            </Style.Triggers>
+        </Style>
+
+        <!-- Buttons: a flat dark template replaces the light Windows chrome for every state.
+             The template reads its hover and pressed fills from ButtonHoverBrush / ButtonPressedBrush,
+             so a derived style (such as AccentButton) only overrides those two keys. -->
+        <Style TargetType="Button">
+            <Style.Resources>
+                <SolidColorBrush x:Key="ButtonHoverBrush" Color="{StaticResource ControlHoverColor}" />
+                <SolidColorBrush x:Key="ButtonPressedBrush" Color="{StaticResource ControlPressedColor}" />
+            </Style.Resources>
+            <Setter Property="Background" Value="{StaticResource ControlBackgroundBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource ControlBorderBrush}" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Setter Property="Padding" Value="16,7" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd"
+                                Background="{TemplateBinding Background}"
+                                BorderBrush="{TemplateBinding BorderBrush}"
+                                BorderThickness="{TemplateBinding BorderThickness}"
+                                CornerRadius="4"
+                                Padding="{TemplateBinding Padding}">
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource ButtonPressedBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{StaticResource TextBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Foreground" Value="{StaticResource DisabledTextBrush}" />
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.6" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- Line icons from Tabler Icons (https://tabler-icons.io, MIT License), drawn on a 24×24 grid. -->
+        <Geometry x:Key="RefreshIcon">M20 11a8.1 8.1 0 0 0 -15.5 -2m-.5 -4v4h4 M4 13a8.1 8.1 0 0 0 15.5 2m.5 4v-4h-4</Geometry>
+        <Geometry x:Key="FolderIcon">M5 4h4l3 3h7a2 2 0 0 1 2 2v8a2 2 0 0 1 -2 2h-14a2 2 0 0 1 -2 -2v-11a2 2 0 0 1 2 -2z</Geometry>
+
+        <!-- A square button showing an icon Geometry as its Content; the stroke follows the button's text color. -->
+        <Style x:Key="IconButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Setter Property="Padding" Value="8,7" />
+            <Setter Property="ToolTipService.InitialShowDelay" Value="300" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="ContentTemplate">
+                <Setter.Value>
+                    <DataTemplate>
+                        <Viewbox Width="18" Height="18">
+                            <Path Width="24" Height="24"
+                                  Data="{Binding}"
+                                  Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=Button}}"
+                                  StrokeThickness="2"
+                                  StrokeLineJoin="Round"
+                                  StrokeStartLineCap="Round"
+                                  StrokeEndLineCap="Round" />
+                        </Viewbox>
+                    </DataTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <Style x:Key="AccentButton" TargetType="Button" BasedOn="{StaticResource {x:Type Button}}">
+            <Style.Resources>
+                <SolidColorBrush x:Key="ButtonHoverBrush" Color="{StaticResource AccentHoverColor}" />
+                <SolidColorBrush x:Key="ButtonPressedBrush" Color="{StaticResource AccentPressedColor}" />
+            </Style.Resources>
+            <Setter Property="Background" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderBrush" Value="{StaticResource AccentBrush}" />
+            <Setter Property="Foreground" Value="White" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+        </Style>
+
+        <!-- Progress bar: dark track with an accent fill; the indeterminate state sweeps a short bar. -->
+        <Style TargetType="ProgressBar">
+            <Setter Property="Height" Value="6" />
+            <Setter Property="Background" Value="{StaticResource ProgressTrackBrush}" />
+            <Setter Property="Foreground" Value="{StaticResource AccentBrush}" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="ProgressBar">
+                        <Border x:Name="PART_Track" Background="{TemplateBinding Background}" CornerRadius="3" ClipToBounds="True">
+                            <Grid>
+                                <Border x:Name="PART_Indicator" HorizontalAlignment="Left" Background="{TemplateBinding Foreground}" CornerRadius="3" />
+                                <Border x:Name="Sweep" Width="80" HorizontalAlignment="Left" Background="{TemplateBinding Foreground}"
+                                        CornerRadius="3" Visibility="Collapsed">
+                                    <Border.RenderTransform>
+                                        <TranslateTransform x:Name="SweepOffset" X="-80" />
+                                    </Border.RenderTransform>
+                                </Border>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsIndeterminate" Value="True">
+                                <Setter TargetName="PART_Indicator" Property="Visibility" Value="Collapsed" />
+                                <Setter TargetName="Sweep" Property="Visibility" Value="Visible" />
+                                <Trigger.EnterActions>
+                                    <BeginStoryboard x:Name="SweepAnimation">
+                                        <Storyboard RepeatBehavior="Forever">
+                                            <DoubleAnimation Storyboard.TargetName="SweepOffset" Storyboard.TargetProperty="X"
+                                                             From="-80" To="700" Duration="0:0:1.4" />
+                                        </Storyboard>
+                                    </BeginStoryboard>
+                                </Trigger.EnterActions>
+                                <Trigger.ExitActions>
+                                    <StopStoryboard BeginStoryboardName="SweepAnimation" />
+                                </Trigger.ExitActions>
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
         </Style>
     </Application.Resources>
 </Application>

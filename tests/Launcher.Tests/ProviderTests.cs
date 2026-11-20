@@ -24,7 +24,7 @@ public class ProviderTests
             }
             """);
 
-        var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, App.CreateProviders());
+        var profile = LoadProfile(profilePath);
 
         Assert.Equal(GoogleDriveStorageProvider.TypeName, profile.UpdateSource?.Type);
         Assert.Equal(
@@ -41,7 +41,7 @@ public class ProviderTests
             { "installedVersion": "1.0", "updateSource": { "type": "http-json", "url": "https://example.com/latest.json" } }
             """);
 
-        var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, App.CreateProviders());
+        var profile = LoadProfile(profilePath);
 
         Assert.Equal(new HttpJsonSettings(new Uri("https://example.com/latest.json")), profile.UpdateSource?.Settings);
     }
@@ -55,14 +55,16 @@ public class ProviderTests
     [InlineData("""{ "installedVersion": "1.0", "updateSource": { "type": "google-drive", "folderId": "abc" } }""")]
     [InlineData("""{ "installedVersion": "1.0", "updateSource": { "type": "google-drive", "folderId": "abc' or '1", "credentials": "key.json" } }""")]
     [InlineData("""{ "installedVersion": "1.0", "updateSource": { "type": "http-json", "url": "http://example.com/latest.json" } }""")]
-    [InlineData("""{ "updateSource": { "type": "google-drive", "folderId": "abc", "credentials": "key.json" } }""")]
+    [InlineData("""{ "installId": "..\\other" }""")]
+    [InlineData("""{ "installId": "" }""")]
+    [InlineData("""{ "executable": "C:\\Windows\\notepad.exe" }""")]
     public void InvalidUpdateSourcesAreConfigurationErrors(string json)
     {
         using var temp = new TempDirectory();
         var profilePath = temp.Write("game.json", json);
 
         Assert.Throws<InvalidDataException>(
-            () => LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, App.CreateProviders()));
+            () => LoadProfile(profilePath));
     }
 
     [Fact]
@@ -79,41 +81,74 @@ public class ProviderTests
     }
 
     [Fact]
-    public async Task AnyRegisteredStorageProviderGetsTheStoreSourceAndDownloader()
+    public void ProfileKeepsInstallSettings()
     {
         using var temp = new TempDirectory();
-        var store = new InMemoryReleaseStore();
-        var file = store.Add("build-2.0.zip", [1, 2, 3]);
-        var providers = new ProviderRegistry([new InMemoryStorageProvider(store)], [new HttpJsonSourceFactory()]);
         var profilePath = temp.Write("game.json", """
-            { "installedVersion": "1.0", "updateSource": { "type": "memory", "name": "test" } }
+            { "displayName": "Erden: Stone?", "executable": "Bin/Game.exe" }
             """);
-        var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, providers);
 
-        using var services = App.CreateServices(profile, providers, temp.Path);
-        var viewModel = services.GetRequiredService<MainWindowViewModel>();
-        var release = await viewModel.CheckForUpdatesAsync();
+        var profile = LoadProfile(profilePath);
 
-        Assert.NotNull(release);
-        Assert.Equal(file, release.File);
-        Assert.True(viewModel.CanDownload(release));
-        var path = await viewModel.DownloadAsync(release, new Progress<double>(), default);
-        Assert.StartsWith(temp.Path, path);
-        Assert.Equal([1, 2, 3], File.ReadAllBytes(path));
+        Assert.Equal("Bin/Game.exe", profile.Executable);
+        Assert.Null(profile.InstalledVersion);
+        Assert.Equal("Erden Stone", profile.InstallFolderName);
+        Assert.Equal("custom", (profile with { InstallId = "custom" }).InstallFolderName);
     }
 
     [Fact]
-    public void ManifestSourcesOpenTheDownloadPageInsteadOfDownloading()
+    public async Task AnyRegisteredStorageProviderCanBeInstalledAndPlayed()
+    {
+        using var temp = new TempDirectory();
+        var store = new InMemoryReleaseStore();
+        store.Add("build-2.0.zip", Zips.Create(("Game.exe", "game")));
+        var providers = new ProviderRegistry([new InMemoryStorageProvider(store)], [new HttpJsonSourceFactory()]);
+        var profilePath = temp.Write("game.json", """{ "updateSource": { "type": "memory", "name": "test" } }""");
+        var profile = LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, providers);
+        var shell = new FakeShell();
+
+        using var services = App.CreateServices(profile, providers, temp.Combine("install"), shell);
+        var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        await viewModel.CheckForUpdatesAsync();
+        await viewModel.InstallUpdateAsync();
+        viewModel.Play();
+
+        Assert.Equal(new Version(2, 0), viewModel.InstalledVersion);
+        Assert.Equal(temp.Combine("install", "versions", "2.0", "Game.exe"), Assert.Single(shell.Apps));
+    }
+
+    [Fact]
+    public async Task ManifestSourcesOpenTheDownloadPageInsteadOfInstalling()
     {
         var profile = new LauncherProfile("Game",
-            UpdateSource: new UpdateSourceConfig(HttpJsonSourceFactory.TypeName, new HttpJsonSettings(new Uri("https://example.com/a.json"))),
+            UpdateSource: new UpdateSourceConfig("manifest", new HttpJsonSettings(new Uri("https://example.com/a.json"))),
             InstalledVersion: new Version(1, 0));
+        var page = new Uri("https://example.com/setup");
+        var providers = new ProviderRegistry([], [new FixedSourceFactory(new UpdateRelease(new Version(2, 0), page))]);
+        var shell = new FakeShell();
+        using var temp = new TempDirectory();
 
-        using var services = App.CreateServices(profile);
+        using var services = App.CreateServices(profile, providers, temp.Path, shell);
         var viewModel = services.GetRequiredService<MainWindowViewModel>();
+        await viewModel.CheckForUpdatesAsync();
 
-        Assert.IsType<HttpJsonUpdateSource>(services.GetRequiredService<IUpdateSource>());
         Assert.Null(services.GetService<IReleaseDownloader>());
-        Assert.False(viewModel.CanDownload(new UpdateRelease(new Version(2, 0), new Uri("https://example.com/setup"))));
+        Assert.Equal("Open download", viewModel.InstallText);
+        await viewModel.InstallUpdateAsync();
+        Assert.Equal(page, Assert.Single(shell.Urls));
+    }
+
+    private static LauncherProfile LoadProfile(string profilePath) =>
+        LauncherProfileLoader.Load(["--profile", profilePath], AppContext.BaseDirectory, App.CreateProviders());
+
+    private sealed class FixedSourceFactory(UpdateRelease release) : IUpdateSourceFactory, IUpdateSource
+    {
+        public string Type => "manifest";
+
+        public ISourceSettings Parse(System.Text.Json.JsonElement json, string baseDirectory) => throw new NotSupportedException();
+
+        public IUpdateSource Create(ISourceSettings settings) => this;
+
+        public Task<UpdateRelease?> GetLatestReleaseAsync(CancellationToken cancellationToken) => Task.FromResult<UpdateRelease?>(release);
     }
 }
